@@ -1,3 +1,5 @@
+ConsoleLog:
+
 ============================================================
 TravelBuddy - Trợ lý Du lịch Thông minh
       Gõ 'quit' để thoát
