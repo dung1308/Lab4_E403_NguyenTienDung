@@ -4,15 +4,22 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import ChatMessage, SystemMessage
 from tools import search_flights, search_hotels, calculate_budget
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # 1. Đọc System Prompt
-with open("system_prompt.txt", "r", encoding="utf-8") as f:
-    SYSTEM_PROMPT = f.read()
+
+#with open("system_prompt.txt", "r", encoding="utf-8") as f:
+#    SYSTEM_PROMPT = f.read()
+try:
+    with open("system_prompt.txt", "r", encoding="utf-8") as f:
+        SYSTEM_PROMPT = f.read()
+except FileNotFoundError:
+    print("Lỗi: Không tìm thấy file system_prompt.txt!")
+    SYSTEM_PROMPT = "Bạn là trợ lý du lịch." # Prompt dự phòng
 
 # 2. Khai báo State
 class AgentState(TypedDict):
@@ -25,22 +32,26 @@ llm_with_tools = llm.bind_tools(tools_list)
 
 # 4. Agent Node
 def agent_node(state: AgentState):
-    messages = state["messages"]
-    
-    # Thêm System Prompt vào đầu danh sách tin nhắn nếu chưa có
-    if not isinstance(messages[0], SystemMessage):
-        messages = [SystemMessage(content=SYSTEM_PROMPT)] + messages
+    try:
+        messages = state["messages"]
+        
+        # Thêm System Prompt vào đầu danh sách tin nhắn nếu chưa có
+        if not isinstance(messages[0], SystemMessage):
+            messages = [SystemMessage(content=SYSTEM_PROMPT)] + messages
 
-    response = llm_with_tools.invoke(messages)
-    
-    # === LOGGING ===
-    if response.tool_calls:
-        for tc in response.tool_calls:
-            print(f"Gọi tool: {tc['name']}({tc['args']})")
-    else:
-        print(f"Trả lời trực tiếp")
+        response = llm_with_tools.invoke(messages)
+        
+        # === LOGGING ===
+        if response.tool_calls:
+            for tc in response.tool_calls:
+                print(f"Gọi tool: {tc['name']}({tc['args']})")
+        else:
+            print(f"Trả lời trực tiếp")
 
-    return {"messages": [response]}
+        return {"messages": [response]}
+    except Exception as e:
+        # Trả về một tin nhắn báo lỗi để Graph vẫn tiếp tục chạy được
+        return {"messages": [ChatMessage(content=f"Lỗi xử lý AI: {str(e)}", role="assistant")]}
 
 # 5. Xây dựng Graph
 builder = StateGraph(AgentState)
@@ -76,17 +87,22 @@ if __name__ == "__main__":
     print("=" * 60)
 
     while True:
-        user_input = input("\nBạn: ").strip()
-        if user_input.lower() in ["quit", "exit", "q"]:
-            break
+        try:
+            user_input = input("\nBạn: ").strip()
+            if user_input.lower() in ["quit", "exit", "q"]:
+                break
 
-        # Blacklist để ngăn chặn người dùng cố tình bypass hệ thống bằng cách yêu cầu AI "quên các quy tắc" hoặc "ignore previous instructions"
-        blacklist = ["ignore previous instructions", "quên các quy tắc", "hệ thống quản trị"]
-        if any(word in user_input.lower() for word in blacklist):
-            print("TravelBuddy: Phát hiện yêu cầu không hợp lệ. Vui lòng hỏi về du lịch!")
+            # Blacklist để ngăn chặn người dùng cố tình bypass hệ thống bằng cách yêu cầu AI "quên các quy tắc" hoặc "ignore previous instructions"
+            blacklist = ["ignore previous instructions", "quên các quy tắc", "hệ thống quản trị"]
+            if any(word in user_input.lower() for word in blacklist):
+                print("TravelBuddy: Phát hiện yêu cầu không hợp lệ. Vui lòng hỏi về du lịch!")
+                continue
+            
+            print("\nTravelBuddy đang suy nghĩ...")
+            result = graph.invoke({"messages": [("human", user_input)]})
+            final = result["messages"][-1]
+            print(f"\nTravelBuddy: {final.content}")
+        except Exception as e:
+            # Nếu lỗi, thông báo nhẹ nhàng và cho phép người dùng nhập lại
+            print(f"\n[Hệ thống]: Có lỗi xảy ra ({e}). Vui lòng thử lại câu hỏi khác!")
             continue
-        
-        print("\nTravelBuddy đang suy nghĩ...")
-        result = graph.invoke({"messages": [("human", user_input)]})
-        final = result["messages"][-1]
-        print(f"\nTravelBuddy: {final.content}")
