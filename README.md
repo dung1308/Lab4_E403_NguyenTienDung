@@ -1,5 +1,5 @@
 # Lab4_E403_NguyenTienDung
-Một bài travel Agent AI đơn giản - Lab 4
-test_results đã test 5 test cases:
-
-<img width="1275" height="1650" alt="image" src="https://github.com/user-attachments/assets/04249f74-2c0a-434e-938e-a1e0c89c0d41" />
+1. Sử dụng VSCode
+2. Ấn Ctrl+Shift+P -> Chọn Python: Select Interpreter -> Chọn Create Virtual Env -> .venv -> Chọn Python.phiên bản
+3. Chạy agent.py
+4. User Workflow: User Input -> Agent AI phân tích input -> Có/Không gọi Tools để lấy dữ liệu -> Tổng hợp dữ liệu và trả kết quả.
